@@ -55,9 +55,10 @@ def get_info(url: str = Query(...)):
     clean_url = clean_yt_url(url)
 
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
+        "quiet":         True,
+        "no_warnings":   True,
         "skip_download": True,
+        "format":        "bestvideo+bestaudio/best",  # evita "format not available"
         **({"cookiefile": COOKIES_FILE} if os.path.exists(COOKIES_FILE) else {}),
     }
 
@@ -75,27 +76,30 @@ def get_info(url: str = Query(...)):
     result_formats = []
     seen_heights   = set()
 
-    # Formatos video+audio combinados (mp4)
-    for f in sorted(formats, key=lambda x: x.get("height", 0) or 0, reverse=True):
-        has_video = f.get("vcodec", "none") not in ("none", None)
-        has_audio = f.get("acodec", "none") not in ("none", None)
-        is_mp4    = f.get("ext") == "mp4"
-        height    = f.get("height") or 0
-
-        if has_video and has_audio and is_mp4 and height and height not in seen_heights:
+    # Formatos video+audio combinados — cualquier contenedor (mp4, webm, etc.)
+    combined = [
+        f for f in formats
+        if f.get("vcodec", "none") not in ("none", None)
+        and f.get("acodec", "none") not in ("none", None)
+        and f.get("height")
+    ]
+    for f in sorted(combined, key=lambda x: x.get("height", 0) or 0, reverse=True):
+        height = f.get("height") or 0
+        if height not in seen_heights:
             seen_heights.add(height)
+            ext   = f.get("ext") or "mp4"
             label = f.get("format_note") or f"{height}p"
             result_formats.append({
                 "format_id":  f["format_id"],
                 "quality":    label,
-                "ext":        "mp4",
+                "ext":        ext,
                 "type":       "video",
                 "filesize":   f.get("filesize") or f.get("filesize_approx"),
                 "stream_url": (
                     f"{BASE_URL}/stream"
                     f"?url={quote(clean_url, safe='')}"
                     f"&format_id={f['format_id']}"
-                    f"&ext=mp4"
+                    f"&ext={ext}"
                     f"&title={quote(safe_title(title_raw), safe='')}"
                 ),
             })
