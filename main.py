@@ -181,6 +181,7 @@ def stream_video(
         "-o", "-",
         "--no-playlist",
         "--quiet",
+        "--extractor-args", "youtube:player_client=android,web",
     ]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
