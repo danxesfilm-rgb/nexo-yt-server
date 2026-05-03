@@ -58,6 +58,34 @@ def root():
     return {"status": "ok", "service": "NEXO YT Server"}
 
 
+# ── Debug: captura stderr de yt-dlp para diagnóstico ─────────────────────────
+@app.get("/debug")
+def debug_info(url: str = Query(...)):
+    clean_url = clean_yt_url(url)
+    cmd = [
+        "yt-dlp",
+        "--dump-json",
+        "--no-playlist",
+        "--extractor-args", "youtube:player_client=tv_embedded,ios,android",
+        "--no-warnings",
+    ]
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+    cmd.append(clean_url)
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return {
+        "returncode": result.returncode,
+        "stdout_preview": result.stdout[:500] if result.stdout else "",
+        "stderr": result.stderr[:2000] if result.stderr else "",
+    }
+
+
 # ── Info: lista todos los formatos sin seleccionar ninguno ───────────────────
 @app.get("/info")
 def get_info(url: str = Query(...)):
