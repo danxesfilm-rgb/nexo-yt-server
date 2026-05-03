@@ -3,12 +3,17 @@ import re
 import shutil
 import subprocess
 from urllib.parse import quote
-import static_ffmpeg
-static_ffmpeg.add_paths()   # garantiza ffmpeg en PATH en cualquier entorno
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import yt_dlp
+
+# Garantizar ffmpeg en PATH usando static-ffmpeg
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass  # Si falla, yt-dlp usará el ffmpeg del sistema si existe
 
 app = FastAPI(title="NEXO YT Server")
 
@@ -25,7 +30,6 @@ BASE_URL = (
     or "http://localhost:8000"
 ).rstrip("/")
 
-# Cookies de YouTube — copiadas a /tmp/ porque /etc/secrets/ es read-only
 _COOKIES_SECRET = "/etc/secrets/cookies.txt"
 COOKIES_FILE    = "/tmp/yt-cookies.txt"
 
@@ -54,22 +58,21 @@ def root():
     return {"status": "ok", "service": "NEXO YT Server"}
 
 
-# ── Info: lista resoluciones disponibles siempre como MP4 ────────────────────
+# ── Info: lista todos los formatos sin seleccionar ninguno ───────────────────
 @app.get("/info")
 def get_info(url: str = Query(...)):
     clean_url = clean_yt_url(url)
 
     ydl_opts = {
-        "quiet":         True,
-        "no_warnings":   True,
-        "skip_download": True,
-        "format":        "best",   # no requiere ffmpeg, solo lista formatos
+        "quiet":       True,
+        "no_warnings": True,
         **cookies_opts(),
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(clean_url, download=False)
+            # process=False: devuelve TODOS los formatos sin validar ni seleccionar
+            info = ydl.extract_info(clean_url, download=False, process=False)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"yt-dlp: {e}")
 
@@ -81,10 +84,10 @@ def get_info(url: str = Query(...)):
     result_formats = []
     seen_heights   = set()
 
-    # Listar resoluciones disponibles por altura — siempre se entregarán como MP4
+    # Formatos con video (cualquier codec), ordenados de mayor a menor calidad
     video_fmts = [
         f for f in formats
-        if f.get("vcodec", "none") not in ("none", None)
+        if f.get("vcodec", "none") not in ("none", None, "")
         and f.get("height")
     ]
 
@@ -95,7 +98,7 @@ def get_info(url: str = Query(...)):
             label    = f.get("format_note") or f"{height}p"
             filesize = f.get("filesize") or f.get("filesize_approx")
             result_formats.append({
-                "format_id":  str(height),   # usamos el height como ID
+                "format_id":  str(height),
                 "quality":    label,
                 "ext":        "mp4",
                 "type":       "video",
@@ -112,8 +115,8 @@ def get_info(url: str = Query(...)):
     # Mejor audio puro → MP3
     audio_fmts = [
         f for f in formats
-        if f.get("vcodec") in ("none", None)
-        and f.get("acodec") not in ("none", None)
+        if f.get("vcodec") in ("none", None, "")
+        and f.get("acodec") not in ("none", None, "")
     ]
     if audio_fmts:
         best_audio = max(audio_fmts, key=lambda x: x.get("abr") or 0)
@@ -154,10 +157,8 @@ def stream_video(
     content_type = "audio/mpeg" if is_audio else "video/mp4"
 
     if is_audio:
-        # Audio: usar format_id directamente
         fmt_arg = format_id
     else:
-        # Video: pedir la mejor calidad hasta esa resolución + audio, merged en MP4
         fmt_arg = (
             f"bestvideo[height<={format_id}][ext=mp4]+bestaudio[ext=m4a]"
             f"/bestvideo[height<={format_id}]+bestaudio"
