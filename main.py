@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 from urllib.parse import quote
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,8 +24,12 @@ BASE_URL = (
     or "http://localhost:8000"
 ).rstrip("/")
 
-# Cookies de YouTube para evitar bloqueo de bot en servidores cloud
-COOKIES_FILE = "/etc/secrets/cookies.txt"
+# Cookies de YouTube — copiadas a /tmp/ porque /etc/secrets/ es read-only
+_COOKIES_SECRET = "/etc/secrets/cookies.txt"
+COOKIES_FILE    = "/tmp/yt-cookies.txt"
+
+if os.path.exists(_COOKIES_SECRET):
+    shutil.copy2(_COOKIES_SECRET, COOKIES_FILE)
 
 
 def clean_yt_url(url: str) -> str:
