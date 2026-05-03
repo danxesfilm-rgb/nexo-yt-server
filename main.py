@@ -64,11 +64,17 @@ def get_info(url: str = Query(...)):
     clean_url = clean_yt_url(url)
 
     ydl_opts = {
-        "quiet":          True,
-        "no_warnings":    True,
-        "skip_download":  True,
-        "check_formats":  False,   # no valida URLs de cada formato → sin errores de selección
-        "format":         "bestvideo+bestaudio/bestvideo/best",
+        "quiet":         True,
+        "no_warnings":   True,
+        "skip_download": True,
+        "check_formats": False,
+        "format":        "bestvideo+bestaudio/bestvideo/best",
+        # Cliente Android bypasea restricciones de IP en servidores cloud
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],
+            }
+        },
         **cookies_opts(),
     }
 
