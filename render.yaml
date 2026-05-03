@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: apt-get install -y ffmpeg && pip install -r requirements.txt && pip install -U yt-dlp
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: pip install -U yt-dlp --quiet && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: BASE_URL
         sync: false
