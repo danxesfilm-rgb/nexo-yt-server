@@ -61,7 +61,6 @@ def get_info(url: str = Query(...)):
         "quiet":         True,
         "no_warnings":   True,
         "skip_download": True,
-        "format":        "bestvideo+bestaudio/best",
         **cookies_opts(),
     }
 
