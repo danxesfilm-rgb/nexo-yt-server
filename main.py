@@ -62,27 +62,33 @@ def root():
 @app.get("/debug")
 def debug_info(url: str = Query(...)):
     clean_url = clean_yt_url(url)
-    cmd = [
-        "yt-dlp",
-        "--dump-json",
-        "--no-playlist",
+
+    # Versión instalada
+    ver = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True)
+
+    # Intento 1: con extractor args
+    cmd1 = [
+        "yt-dlp", "--dump-json", "--no-playlist",
         "--extractor-args", "youtube:player_client=tv_embedded,ios,android",
         "--no-warnings",
     ]
     if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd.append(clean_url)
+        cmd1 += ["--cookies", COOKIES_FILE]
+    cmd1.append(clean_url)
+    r1 = subprocess.run(cmd1, capture_output=True, text=True, timeout=30)
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    # Intento 2: sin extractor args (cliente por defecto)
+    cmd2 = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", clean_url]
+    r2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=30)
+
     return {
-        "returncode": result.returncode,
-        "stdout_preview": result.stdout[:500] if result.stdout else "",
-        "stderr": result.stderr[:2000] if result.stderr else "",
+        "yt_dlp_version": ver.stdout.strip(),
+        "cookies_file_exists": os.path.exists(COOKIES_FILE),
+        "attempt1_returncode": r1.returncode,
+        "attempt1_stdout": r1.stdout[:300] if r1.stdout else "",
+        "attempt1_stderr": r1.stderr[:1000] if r1.stderr else "",
+        "attempt2_returncode": r2.returncode,
+        "attempt2_stderr": r2.stderr[:1000] if r2.stderr else "",
     }
 
 
