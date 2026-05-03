@@ -64,15 +64,17 @@ def get_info(url: str = Query(...)):
     clean_url = clean_yt_url(url)
 
     ydl_opts = {
-        "quiet":       True,
-        "no_warnings": True,
+        "quiet":          True,
+        "no_warnings":    True,
+        "skip_download":  True,
+        "check_formats":  False,   # no valida URLs de cada formato → sin errores de selección
+        "format":         "bestvideo+bestaudio/bestvideo/best",
         **cookies_opts(),
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # process=False: devuelve TODOS los formatos sin validar ni seleccionar
-            info = ydl.extract_info(clean_url, download=False, process=False)
+            info = ydl.extract_info(clean_url, download=False)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"yt-dlp: {e}")
 
