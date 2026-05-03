@@ -23,6 +23,9 @@ BASE_URL = (
     or "http://localhost:8000"
 ).rstrip("/")
 
+# Cookies de YouTube para evitar bloqueo de bot en servidores cloud
+COOKIES_FILE = "/etc/secrets/cookies.txt"
+
 
 def clean_yt_url(url: str) -> str:
     m = re.search(r'(?:v=|youtu\.be/)([^&?/\s]{8,})', url)
@@ -50,6 +53,7 @@ def get_info(url: str = Query(...)):
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
+        **({"cookiefile": COOKIES_FILE} if os.path.exists(COOKIES_FILE) else {}),
     }
 
     try:
