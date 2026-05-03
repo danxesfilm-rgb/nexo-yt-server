@@ -97,20 +97,26 @@ def debug_info(url: str = Query(...)):
 def get_info(url: str = Query(...)):
     clean_url = clean_yt_url(url)
 
-    ydl_opts = {
-        "quiet":         True,
-        "no_warnings":   True,
-        "skip_download": True,
-        "check_formats": False,
-        "format":        "bestvideo+bestaudio/bestvideo/best",
-        **cookies_opts(),
-    }
+    cmd = [
+        "yt-dlp",
+        "--dump-json",
+        "--no-playlist",
+        "--no-warnings",
+    ]
+    if os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+    cmd.append(clean_url)
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(clean_url, download=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
+        if result.returncode != 0:
+            raise HTTPException(status_code=502, detail=f"yt-dlp: {result.stderr[:300]}")
+        import json as _json
+        info = _json.loads(result.stdout)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"yt-dlp: {e}")
+        raise HTTPException(status_code=502, detail=f"yt-dlp parse error: {e}")
 
     vid_id    = info.get("id", "")
     title_raw = info.get("title", "Video de YouTube")
