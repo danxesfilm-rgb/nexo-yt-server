@@ -3,6 +3,8 @@ import re
 import shutil
 import subprocess
 from urllib.parse import quote
+import static_ffmpeg
+static_ffmpeg.add_paths()   # garantiza ffmpeg en PATH en cualquier entorno
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -61,6 +63,7 @@ def get_info(url: str = Query(...)):
         "quiet":         True,
         "no_warnings":   True,
         "skip_download": True,
+        "format":        "best",   # no requiere ffmpeg, solo lista formatos
         **cookies_opts(),
     }
 
