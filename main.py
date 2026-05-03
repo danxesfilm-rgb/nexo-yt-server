@@ -103,12 +103,6 @@ def get_info(url: str = Query(...)):
         "skip_download": True,
         "check_formats": False,
         "format":        "bestvideo+bestaudio/bestvideo/best",
-        # tv_embedded + ios bypasea restricciones de IP en servidores cloud
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded", "ios", "android"],
-            }
-        },
         **cookies_opts(),
     }
 
@@ -215,7 +209,6 @@ def stream_video(
         "-o", "-",
         "--no-playlist",
         "--quiet",
-        "--extractor-args", "youtube:player_client=tv_embedded,ios,android",
     ]
     if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
