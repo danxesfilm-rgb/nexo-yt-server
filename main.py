@@ -113,29 +113,39 @@ def get_info(url: str = Query(...)):
 
     import json as _json
 
-    def run_ytdlp(use_cookies: bool):
-        cmd = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats"]
-        if use_cookies:
-            # mweb no requiere PO token al usar cookies
-            cmd += ["--extractor-args", "youtube:player_client=mweb"]
-            if os.path.exists(COOKIES_FILE):
-                cmd += ["--cookies", COOKIES_FILE]
-        cmd.append(clean_url)
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=40)
+    def extract_info(use_cookies: bool) -> dict:
+        opts = {
+            "quiet":                   True,
+            "no_warnings":             True,
+            "skip_download":           True,
+            "check_formats":           False,
+            "ignore_no_formats_error": True,   # no aborta si ningún formato encaja
+            "noplaylist":              True,
+        }
+        if use_cookies and os.path.exists(COOKIES_FILE):
+            opts["cookiefile"] = COOKIES_FILE
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            return ydl.extract_info(clean_url, download=False)
 
     try:
-        # Intento 1: sin cookies (más compatible con videos populares)
-        result = run_ytdlp(use_cookies=False)
-        # Si falla por bot-detection, reintenta con cookies
-        if result.returncode != 0 and "Sign in" in result.stderr:
-            result = run_ytdlp(use_cookies=True)
-        if result.returncode != 0:
-            raise HTTPException(status_code=502, detail=f"yt-dlp: {result.stderr[:300]}")
-        info = _json.loads(result.stdout)
+        # Intento 1: sin cookies
+        info = extract_info(use_cookies=False)
+        # Si no hay formatos o hay error de bot, reintenta con cookies
+        if not info or not info.get("formats"):
+            info = extract_info(use_cookies=True)
+        if not info:
+            raise HTTPException(status_code=502, detail="No se pudo extraer información del video.")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"yt-dlp parse error: {e}")
+        err = str(e)
+        if "Sign in" in err or "bot" in err:
+            try:
+                info = extract_info(use_cookies=True)
+            except Exception as e2:
+                raise HTTPException(status_code=502, detail=f"yt-dlp: {e2}")
+        else:
+            raise HTTPException(status_code=502, detail=f"yt-dlp: {e}")
 
     vid_id    = info.get("id", "")
     title_raw = info.get("title", "Video de YouTube")
