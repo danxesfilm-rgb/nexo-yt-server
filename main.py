@@ -30,8 +30,13 @@ BASE_URL = (
     or "http://localhost:8000"
 ).rstrip("/")
 
-_COOKIES_SECRET = "/etc/secrets/cookies.txt"
-COOKIES_FILE    = "/tmp/yt-cookies.txt"
+# Render guarda Secret Files sin extensión: /etc/secrets/cookies
+_COOKIES_SECRET = (
+    "/etc/secrets/cookies"      # nombre real en Render (sin .txt)
+    if os.path.exists("/etc/secrets/cookies")
+    else "/etc/secrets/cookies.txt"
+)
+COOKIES_FILE = "/tmp/yt-cookies.txt"
 
 if os.path.exists(_COOKIES_SECRET):
     shutil.copy2(_COOKIES_SECRET, COOKIES_FILE)
