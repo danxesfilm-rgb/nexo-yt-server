@@ -61,34 +61,39 @@ def root():
 # ── Debug: captura stderr de yt-dlp para diagnóstico ─────────────────────────
 @app.get("/debug")
 def debug_info(url: str = Query(...)):
+    import json as _json
     clean_url = clean_yt_url(url)
 
-    # Versión instalada
     ver = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True)
 
-    # Intento 1: con extractor args
-    cmd1 = [
-        "yt-dlp", "--dump-json", "--no-playlist",
-        "--extractor-args", "youtube:player_client=tv_embedded,ios,android",
-        "--no-warnings",
-    ]
-    if os.path.exists(COOKIES_FILE):
-        cmd1 += ["--cookies", COOKIES_FILE]
-    cmd1.append(clean_url)
-    r1 = subprocess.run(cmd1, capture_output=True, text=True, timeout=30)
+    # Sin cookies
+    cmd_no_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", clean_url]
+    r_no = subprocess.run(cmd_no_cookies, capture_output=True, text=True, timeout=40)
 
-    # Intento 2: sin extractor args (cliente por defecto)
-    cmd2 = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", clean_url]
-    r2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=30)
+    # Con cookies
+    cmd_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings"]
+    if os.path.exists(COOKIES_FILE):
+        cmd_cookies += ["--cookies", COOKIES_FILE]
+    cmd_cookies.append(clean_url)
+    r_co = subprocess.run(cmd_cookies, capture_output=True, text=True, timeout=40)
+
+    # Parseo del JSON si exitoso
+    formats_count = 0
+    if r_co.returncode == 0 and r_co.stdout:
+        try:
+            info = _json.loads(r_co.stdout)
+            formats_count = len(info.get("formats", []))
+        except Exception:
+            pass
 
     return {
         "yt_dlp_version": ver.stdout.strip(),
         "cookies_file_exists": os.path.exists(COOKIES_FILE),
-        "attempt1_returncode": r1.returncode,
-        "attempt1_stdout": r1.stdout[:300] if r1.stdout else "",
-        "attempt1_stderr": r1.stderr[:1000] if r1.stderr else "",
-        "attempt2_returncode": r2.returncode,
-        "attempt2_stderr": r2.stderr[:1000] if r2.stderr else "",
+        "no_cookies_rc": r_no.returncode,
+        "no_cookies_stderr": r_no.stderr[:500] if r_no.stderr else "",
+        "with_cookies_rc": r_co.returncode,
+        "with_cookies_stderr": r_co.stderr[:500] if r_co.stderr else "",
+        "with_cookies_formats_count": formats_count,
     }
 
 
