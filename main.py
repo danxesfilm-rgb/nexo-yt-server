@@ -107,10 +107,8 @@ def get_info(url: str = Query(...)):
         "--dump-json",
         "--no-playlist",
         "--no-warnings",
+        clean_url,
     ]
-    if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd.append(clean_url)
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
@@ -220,10 +218,8 @@ def stream_video(
         "-o", "-",
         "--no-playlist",
         "--quiet",
+        clean_url,
     ]
-    if os.path.exists(COOKIES_FILE):
-        cmd += ["--cookies", COOKIES_FILE]
-    cmd.append(clean_url)
 
     def generate():
         proc = subprocess.Popen(
