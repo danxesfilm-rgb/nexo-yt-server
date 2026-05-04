@@ -71,38 +71,32 @@ def debug_info(url: str = Query(...)):
 
     ver = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True)
 
-    base_flags = ["--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats"]
+    base = ["--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats"]
+    cookies_arg = ["--cookies", COOKIES_FILE] if os.path.exists(COOKIES_FILE) else []
 
-    # Intento 1: sin cookies, cliente por defecto
-    cmd_no_cookies = ["yt-dlp"] + base_flags + [clean_url]
-    r_no = subprocess.run(cmd_no_cookies, capture_output=True, text=True, timeout=40)
+    def run(extra_args):
+        cmd = ["yt-dlp"] + base + extra_args + [clean_url]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=40)
 
-    # Intento 2: cookies + mweb (no requiere PO token)
-    cmd_cookies = ["yt-dlp"] + base_flags + [
-        "--extractor-args", "youtube:player_client=mweb",
-    ]
-    if os.path.exists(COOKIES_FILE):
-        cmd_cookies += ["--cookies", COOKIES_FILE]
-    cmd_cookies.append(clean_url)
-    r_co = subprocess.run(cmd_cookies, capture_output=True, text=True, timeout=40)
+    r1 = run([])                                                          # sin cookies
+    r2 = run(cookies_arg)                                                 # cookies, web
+    r3 = run(cookies_arg + ["--extractor-args", "youtube:player_client=tv_embedded"])   # tv_embedded
+    r4 = run(cookies_arg + ["--extractor-args", "youtube:player_client=ios"])           # ios
 
-    # Parseo del JSON si exitoso
-    formats_count = 0
-    if r_co.returncode == 0 and r_co.stdout:
+    def fcount(r):
         try:
-            info = _json.loads(r_co.stdout)
-            formats_count = len(info.get("formats", []))
+            import json as _j
+            return len(_j.loads(r.stdout).get("formats", [])) if r.returncode == 0 else 0
         except Exception:
-            pass
+            return 0
 
     return {
-        "yt_dlp_version": ver.stdout.strip(),
-        "cookies_file_exists": os.path.exists(COOKIES_FILE),
-        "no_cookies_rc": r_no.returncode,
-        "no_cookies_stderr": r_no.stderr[:500] if r_no.stderr else "",
-        "with_cookies_rc": r_co.returncode,
-        "with_cookies_stderr": r_co.stderr[:500] if r_co.stderr else "",
-        "with_cookies_formats_count": formats_count,
+        "yt_dlp_version":        subprocess.run(["yt-dlp","--version"], capture_output=True, text=True).stdout.strip(),
+        "cookies_file_exists":   os.path.exists(COOKIES_FILE),
+        "r1_no_cookies_rc":      r1.returncode, "r1_stderr": r1.stderr[:300],
+        "r2_web_cookies_rc":     r2.returncode, "r2_stderr": r2.stderr[:300],
+        "r3_tv_embedded_rc":     r3.returncode, "r3_stderr": r3.stderr[:300], "r3_formats": fcount(r3),
+        "r4_ios_rc":             r4.returncode, "r4_stderr": r4.stderr[:300], "r4_formats": fcount(r4),
     }
 
 
