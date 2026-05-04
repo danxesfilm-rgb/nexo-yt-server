@@ -71,12 +71,15 @@ def debug_info(url: str = Query(...)):
 
     ver = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True)
 
+    base_flags = ["--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats",
+                  "-f", "bestvideo+bestaudio/bestvideo/best"]
+
     # Sin cookies
-    cmd_no_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats", clean_url]
+    cmd_no_cookies = ["yt-dlp"] + base_flags + [clean_url]
     r_no = subprocess.run(cmd_no_cookies, capture_output=True, text=True, timeout=40)
 
     # Con cookies
-    cmd_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats"]
+    cmd_cookies = ["yt-dlp"] + base_flags
     if os.path.exists(COOKIES_FILE):
         cmd_cookies += ["--cookies", COOKIES_FILE]
     cmd_cookies.append(clean_url)
@@ -110,7 +113,11 @@ def get_info(url: str = Query(...)):
     import json as _json
 
     def run_ytdlp(use_cookies: bool):
-        cmd = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats"]
+        cmd = [
+            "yt-dlp", "--dump-json", "--no-playlist", "--no-warnings",
+            "--no-check-formats",
+            "-f", "bestvideo+bestaudio/bestvideo/best",
+        ]
         if use_cookies and os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(clean_url)
