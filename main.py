@@ -72,11 +72,11 @@ def debug_info(url: str = Query(...)):
     ver = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True)
 
     # Sin cookies
-    cmd_no_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", clean_url]
+    cmd_no_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats", clean_url]
     r_no = subprocess.run(cmd_no_cookies, capture_output=True, text=True, timeout=40)
 
     # Con cookies
-    cmd_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings"]
+    cmd_cookies = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats"]
     if os.path.exists(COOKIES_FILE):
         cmd_cookies += ["--cookies", COOKIES_FILE]
     cmd_cookies.append(clean_url)
@@ -110,7 +110,7 @@ def get_info(url: str = Query(...)):
     import json as _json
 
     def run_ytdlp(use_cookies: bool):
-        cmd = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings"]
+        cmd = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", "--no-check-formats"]
         if use_cookies and os.path.exists(COOKIES_FILE):
             cmd += ["--cookies", COOKIES_FILE]
         cmd.append(clean_url)
