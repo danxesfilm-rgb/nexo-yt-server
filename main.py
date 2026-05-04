@@ -102,19 +102,23 @@ def debug_info(url: str = Query(...)):
 def get_info(url: str = Query(...)):
     clean_url = clean_yt_url(url)
 
-    cmd = [
-        "yt-dlp",
-        "--dump-json",
-        "--no-playlist",
-        "--no-warnings",
-        clean_url,
-    ]
+    import json as _json
+
+    def run_ytdlp(use_cookies: bool):
+        cmd = ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings"]
+        if use_cookies and os.path.exists(COOKIES_FILE):
+            cmd += ["--cookies", COOKIES_FILE]
+        cmd.append(clean_url)
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=40)
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
+        # Intento 1: sin cookies (más compatible con videos populares)
+        result = run_ytdlp(use_cookies=False)
+        # Si falla por bot-detection, reintenta con cookies
+        if result.returncode != 0 and "Sign in" in result.stderr:
+            result = run_ytdlp(use_cookies=True)
         if result.returncode != 0:
             raise HTTPException(status_code=502, detail=f"yt-dlp: {result.stderr[:300]}")
-        import json as _json
         info = _json.loads(result.stdout)
     except HTTPException:
         raise
@@ -211,6 +215,13 @@ def stream_video(
             f"/best"
         )
 
+    # Detectar si necesita cookies probando primero sin ellas
+    probe = subprocess.run(
+        ["yt-dlp", "--dump-json", "--no-playlist", "--no-warnings", clean_url],
+        capture_output=True, text=True, timeout=30,
+    )
+    needs_cookies = probe.returncode != 0 and "Sign in" in probe.stderr
+
     cmd = [
         "yt-dlp",
         "-f", fmt_arg,
@@ -218,8 +229,10 @@ def stream_video(
         "-o", "-",
         "--no-playlist",
         "--quiet",
-        clean_url,
     ]
+    if needs_cookies and os.path.exists(COOKIES_FILE):
+        cmd += ["--cookies", COOKIES_FILE]
+    cmd.append(clean_url)
 
     def generate():
         proc = subprocess.Popen(
