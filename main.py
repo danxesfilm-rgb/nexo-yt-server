@@ -13,7 +13,7 @@ try:
     import static_ffmpeg
     static_ffmpeg.add_paths()
 except Exception:
-    pass  # Si falla, yt-dlp usará el ffmpeg del sistema si existe
+    pass  # Si falla, yt-dlp usará el ffmpeg del sistema si existeh
 
 app = FastAPI(title="NEXO YT Server")
 
@@ -246,7 +246,7 @@ def stream_video(
         "--no-playlist",
         "--quiet",
     ]
-    if needs_cookies and os.path.exists(COOKIES_FILE):
+    if os.path.exists(COOKIES_FILE):
         cmd += ["--cookies", COOKIES_FILE]
     cmd.append(clean_url)
 
