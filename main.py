@@ -274,3 +274,82 @@ def stream_video(
             "Cache-Control":       "no-cache",
         },
     )
+
+
+# ── Embed: extrae URL directa del video desde la página embed de Instagram ───────────
+@app.get("/embed")
+def instagram_embed(url: str = Query(...)):
+    """Obtiene la URL directa de MP4 de un post de Instagram scrapeando su embed page."""
+    import re as _re
+    import http.cookiejar as _cj
+    import urllib.request as _ur
+
+    m = _re.search(r'/(p|reel|tv|reels)/([A-Za-z0-9_-]+)', url)
+    if not m:
+        raise HTTPException(status_code=400, detail="URL de Instagram invalida")
+    shortcode = m.group(2)
+
+    embed_url = f"https://www.instagram.com/p/{shortcode}/embed/captioned/"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Referer": "https://www.instagram.com/",
+    }
+
+    # Parsear cookies del archivo Netscape e inyectarlas como header Cookie
+    if os.path.exists(COOKIES_FILE):
+        try:
+            cj = _cj.MozillaCookieJar()
+            cj.load(COOKIES_FILE, ignore_discard=True, ignore_expires=True)
+            ig_cookies = [(c.name, c.value) for c in cj if "instagram" in c.domain]
+            if ig_cookies:
+                headers["Cookie"] = "; ".join(f"{n}={v}" for n, v in ig_cookies)
+        except Exception:
+            pass
+
+    try:
+        req = _ur.Request(embed_url, headers=headers)
+        with _ur.urlopen(req, timeout=15) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error fetching embed: {e}")
+
+    # Extraer URL del video
+    video_url = None
+    for pat in [
+        r'"video_url"\s*:\s*"([^"]+)"',
+        r'"contentUrl"\s*:\s*"([^"]+)"',
+        r'<meta[^>]+property=["\']og:video:secure_url["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:video:secure_url["\']',
+        r'<meta[^>]+property=["\']og:video["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:video["\']',
+    ]:
+        match = _re.search(pat, html)
+        if match:
+            video_url = match.group(1).replace("\\u0026", "&").replace("\\\\", "")
+            break
+
+    if not video_url:
+        raise HTTPException(status_code=404, detail="No se encontro URL del video en el embed de Instagram")
+
+    # Extraer thumbnail
+    thumb_url = ""
+    for pat in [
+        r'"thumbnail_src"\s*:\s*"([^"]+)"',
+        r'"display_url"\s*:\s*"([^"]+)"',
+        r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+    ]:
+        match = _re.search(pat, html)
+        if match:
+            thumb_url = match.group(1).replace("\\u0026", "&").replace("\\\\", "")
+            break
+
+    # Extraer título
+    title = ""
+    mt = _re.search(r'<title>([^<]+)</title>', html)
+    if mt:
+        title = _re.sub(r'\s*[•·]\s*Instagram.*$', '', mt.group(1), flags=_re.I).strip()
+
+    return {"video_url": video_url, "thumbnail": thumb_url, "title": title or "Post de Instagram"}
